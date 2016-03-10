@@ -53,17 +53,10 @@ fn get_cargo_toml_path() -> String {
 
 fn cargo(command: &str) -> String {
 	if command == "build" {
-		let output = Command::new("cargo")
-							 .arg("build")
-							 .arg("--release")
-							 .output()
-							 .unwrap();
+		let output = Command::new("cargo").arg("build").arg("--release").output().unwrap();
 		return String::from_utf8_lossy(&output.stdout).into_owned();
 	} else {
-		let output = Command::new("cargo")
-							 .arg(command)
-							 .output()
-							 .unwrap();
+		let output = Command::new("cargo").arg(command).output().unwrap();
 		return String::from_utf8_lossy(&output.stdout).into_owned();
 	}
 }
