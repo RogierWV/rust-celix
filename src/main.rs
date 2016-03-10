@@ -4,7 +4,7 @@ extern crate zip;
 extern crate rustc_serialize;
 extern crate toml;
 use std::env::args;
-use std::fs::{File,metadata};
+use std::fs::{File,metadata,copy};
 // use std::io::Read;
 use std::io::prelude::*;
 use std::process::Command;
@@ -16,22 +16,25 @@ fn main() {
 		println!("{}",cargo("build"));
 		zip();
 	}
-	println!("{}", get_lib_name(".so"));
+	// println!("{}", get_lib_name(".so"));
 
 }
 
-fn zip() {
+fn zip<'a>() {
 	// let mut f = try!(File::create(get_lib_name(".zip")));
 	// println!("Creating {}", f);
 	// let mut zip = ZipWriter::new(f);
 	// try!(zip.start_file("lib"+toml_lookup("package.name")+".zip", Stored));
 	// try!(zip.write());
-
-	println!("{}", String::from_utf8_lossy(&Command::new("zip").arg(get_lib_name(".zip")).arg(get_lib_name(".so")).output().unwrap().stdout));
+	let tmpdir : String = String::from_utf8_lossy(&Command::new("mktemp").arg("-dt").arg("rust-celix.XXXXXXXXXXXXXX").output().unwrap().stdout).into_owned().trim_right().to_string();
+	// println!("{:?}", tmpdir);
+	//copy files into tmpdir
+	copy(get_lib_name("target/release/lib",".so"),get_lib_name(tmpdir.as_str(),".so"));
+	println!("{}", String::from_utf8_lossy(&Command::new("zip").current_dir(tmpdir).arg(get_lib_name(tmpdir.as_str(),".zip")).arg(get_lib_name(tmpdir.as_str(),".so")).output().unwrap().stdout));
 }
 
 fn check_built(ext: &str) -> bool {
-	metadata(get_lib_name(ext)).is_ok()
+	metadata(get_lib_name("target/release/lib",ext)).is_ok()
 }
 
 fn get_cargo_toml_path() -> String {
@@ -61,9 +64,9 @@ fn cargo(command: &str) -> String {
 	}
 }
 
-fn get_lib_name(ext: &str) -> String {
+fn get_lib_name(pre: &str, ext: &str) -> String {
 	let base_name = toml_lookup("package.name").replace("-","_");
-	(("target/release/lib".to_string() + base_name.as_str()) + ext).to_string()
+	((pre.to_string() + base_name.as_str()) + ext).to_string()
 }
 
 fn toml_lookup(name: &str) -> String {
