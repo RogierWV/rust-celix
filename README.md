@@ -5,9 +5,9 @@ Provides bindings for Celix and a build tool for compiling and packing a Celix b
 
 ## Requirements
 * Linux (might work on other Unix(like) systems, but not tested)
-* Celix installed (currently only in /usr/local)
-* zip command available on PATH
-* /tmp available
+* Celix installed (currently only in `/usr/local`)
+* `zip` command available on `$PATH`
+* `/tmp` available
 * git
 * Rust (only tested on nightly)
 * Cargo
