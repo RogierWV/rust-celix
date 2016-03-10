@@ -33,20 +33,10 @@ Private-Library: lib{}.so
 }
 
 fn bundle<'a>() {
-	// let mut f = try!(File::create(get_lib_name(".zip")));
-	// println!("Creating {}", f);
-	// let mut zip = ZipWriter::new(f);
-	// try!(zip.start_file("lib"+toml_lookup("package.name")+".zip", Stored));
-	// try!(zip.write());
 	let tmpdir : String = String::from_utf8_lossy(&Command::new("mktemp").arg("-dt").arg("rust-celix.XXXXXXXXXXXXXX").output().unwrap().stdout).into_owned().trim_right().to_string() + "/";
-	// println!("{:?}", tmpdir);
-	//copy files into tmpdir
-	// println!("{}", get_lib_name((tmpdir.as_str().clone().to_string()+"lib").as_str().clone(),".so"));
     copy(get_lib_name("target/release/lib",".so"),get_lib_name((tmpdir.as_str().clone().to_string()+"lib").as_str().clone(),".so"));
     let _ = Command::new("mkdir").arg("-p").arg(tmpdir.as_str().clone().to_string()+"META-INF").output().unwrap().stdout;
-    // copy("src/META-INF/MANIFEST.MF",tmpdir.as_str().clone().to_string()+"META-INF/MANIFEST.MF");
     File::create(tmpdir.as_str().clone().to_string()+"META-INF/MANIFEST.MF").unwrap().write_all(manifest().as_bytes()).unwrap();
-
 	println!("{}", String::from_utf8_lossy(&Command::new("ls").current_dir(tmpdir.as_str().clone()).output().unwrap().stdout));
 	println!("{}", String::from_utf8_lossy(&Command::new("zip").current_dir(tmpdir.as_str().clone()).arg(get_lib_name("",".zip")).arg(get_lib_name("lib",".so")).arg("META-INF/MANIFEST.MF").output().unwrap().stdout));
 	copy(get_lib_name(tmpdir.as_str().clone(),".zip"),("deploy/bundles/".to_string()+toml_lookup("package.name").replace("-","_").as_str()).to_string()+".zip");
