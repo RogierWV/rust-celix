@@ -1,4 +1,4 @@
-extern crate zip;
+// extern crate zip;
 // use zip::{ZipWriter,CompressionMethod::*};
 // use std::io::Write;
 extern crate rustc_serialize;
@@ -14,13 +14,25 @@ fn main() {
 	if !check_built(".so") {
 		println!("Need to build!");
 		println!("{}",cargo("build"));
-		zip();
 	}
+	bundle();
 	// println!("{}", get_lib_name(".so"));
 
 }
 
-fn zip<'a>() {
+fn manifest() -> String {
+	let package_name = toml_lookup("package.name").replace("-","_");
+    return format!(
+"Manifest-Version: 1.0
+Bundle-SymbolicName: {}
+Bundle-Name: {}
+Bundle-Version: {}
+Bundle-Activator: lib{}.so
+Private-Library: lib{}.so
+", package_name,package_name,toml_lookup("package.version"),package_name,package_name);
+}
+
+fn bundle<'a>() {
 	// let mut f = try!(File::create(get_lib_name(".zip")));
 	// println!("Creating {}", f);
 	// let mut zip = ZipWriter::new(f);
@@ -29,10 +41,15 @@ fn zip<'a>() {
 	let tmpdir : String = String::from_utf8_lossy(&Command::new("mktemp").arg("-dt").arg("rust-celix.XXXXXXXXXXXXXX").output().unwrap().stdout).into_owned().trim_right().to_string() + "/";
 	// println!("{:?}", tmpdir);
 	//copy files into tmpdir
-	println!("{}", get_lib_name((tmpdir.as_str().clone().to_string()+"lib").as_str().clone(),".so"));
+	// println!("{}", get_lib_name((tmpdir.as_str().clone().to_string()+"lib").as_str().clone(),".so"));
     copy(get_lib_name("target/release/lib",".so"),get_lib_name((tmpdir.as_str().clone().to_string()+"lib").as_str().clone(),".so"));
-	println!("{}", String::from_utf8_lossy(&Command::new("pwd").current_dir(tmpdir.as_str().clone()).output().unwrap().stdout));
-	println!("{}", String::from_utf8_lossy(&Command::new("zip").current_dir(tmpdir.as_str().clone()).arg(get_lib_name("",".zip")).arg(get_lib_name("lib",".so")).output().unwrap().stdout));
+    let _ = Command::new("mkdir").arg("-p").arg(tmpdir.as_str().clone().to_string()+"META-INF").output().unwrap().stdout;
+    // copy("src/META-INF/MANIFEST.MF",tmpdir.as_str().clone().to_string()+"META-INF/MANIFEST.MF");
+    File::create(tmpdir.as_str().clone().to_string()+"META-INF/MANIFEST.MF").unwrap().write_all(manifest().as_bytes()).unwrap();
+
+	println!("{}", String::from_utf8_lossy(&Command::new("ls").current_dir(tmpdir.as_str().clone()).output().unwrap().stdout));
+	println!("{}", String::from_utf8_lossy(&Command::new("zip").current_dir(tmpdir.as_str().clone()).arg(get_lib_name("",".zip")).arg(get_lib_name("lib",".so")).arg("META-INF/MANIFEST.MF").output().unwrap().stdout));
+	copy(get_lib_name(tmpdir.as_str().clone(),".zip"),("deploy/bundles/".to_string()+toml_lookup("package.name").replace("-","_").as_str()).to_string()+".zip");
 	let _ = Command::new("rm").arg("-rf").arg(tmpdir).output().unwrap().stdout;
 }
 

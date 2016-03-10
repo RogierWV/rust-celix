@@ -5,7 +5,7 @@ authors = ["Rogier Velting <rogiervelting@gmail.com>"]
 build = "build.rs"
 
 [dependencies]
-zip = { version = "0.1.16", default-features = false }
+# zip = { version = "0.1.16", default-features = false }
 rustc-serialize = "0.3"
 toml = "0.1"
 
