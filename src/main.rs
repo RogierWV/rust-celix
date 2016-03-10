@@ -1,11 +1,7 @@
-// extern crate zip;
-// use zip::{ZipWriter,CompressionMethod::*};
-// use std::io::Write;
 extern crate rustc_serialize;
 extern crate toml;
 use std::env::args;
 use std::fs::{File,metadata,copy};
-// use std::io::Read;
 use std::io::prelude::*;
 use std::process::Command;
 use rustc_serialize::json::Json;
@@ -16,13 +12,11 @@ fn main() {
 		println!("{}",cargo("build"));
 	}
 	bundle();
-	// println!("{}", get_lib_name(".so"));
-
 }
 
 fn manifest() -> String {
 	let package_name = toml_lookup("package.name").replace("-","_");
-    return format!(
+	return format!(
 "Manifest-Version: 1.0
 Bundle-SymbolicName: {}
 Bundle-Name: {}
@@ -34,9 +28,9 @@ Private-Library: lib{}.so
 
 fn bundle<'a>() {
 	let tmpdir : String = String::from_utf8_lossy(&Command::new("mktemp").arg("-dt").arg("rust-celix.XXXXXXXXXXXXXX").output().unwrap().stdout).into_owned().trim_right().to_string() + "/";
-    copy(get_lib_name("target/release/lib",".so"),get_lib_name((tmpdir.as_str().clone().to_string()+"lib").as_str().clone(),".so"));
-    let _ = Command::new("mkdir").arg("-p").arg(tmpdir.as_str().clone().to_string()+"META-INF").output().unwrap().stdout;
-    File::create(tmpdir.as_str().clone().to_string()+"META-INF/MANIFEST.MF").unwrap().write_all(manifest().as_bytes()).unwrap();
+	copy(get_lib_name("target/release/lib",".so"),get_lib_name((tmpdir.as_str().clone().to_string()+"lib").as_str().clone(),".so"));
+	let _ = Command::new("mkdir").arg("-p").arg(tmpdir.as_str().clone().to_string()+"META-INF").output().unwrap().stdout;
+	File::create(tmpdir.as_str().clone().to_string()+"META-INF/MANIFEST.MF").unwrap().write_all(manifest().as_bytes()).unwrap();
 	println!("{}", String::from_utf8_lossy(&Command::new("ls").current_dir(tmpdir.as_str().clone()).output().unwrap().stdout));
 	println!("{}", String::from_utf8_lossy(&Command::new("zip").current_dir(tmpdir.as_str().clone()).arg(get_lib_name("",".zip")).arg(get_lib_name("lib",".so")).arg("META-INF/MANIFEST.MF").output().unwrap().stdout));
 	copy(get_lib_name(tmpdir.as_str().clone(),".zip"),("deploy/bundles/".to_string()+toml_lookup("package.name").replace("-","_").as_str()).to_string()+".zip");
