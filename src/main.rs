@@ -26,7 +26,7 @@ Private-Library: lib{}.so
 ", package_name,package_name,toml_lookup("package.version"),package_name,package_name);
 }
 
-fn bundle<'a>() {
+fn bundle() {
 	let tmpdir : String = String::from_utf8_lossy(&Command::new("mktemp").arg("-dt").arg("rust-celix.XXXXXXXXXXXXXX").output().unwrap().stdout).into_owned().trim_right().to_string() + "/";
 	copy(get_lib_name("target/release/lib",".so"),get_lib_name((tmpdir.as_str().clone().to_string()+"lib").as_str().clone(),".so"));
 	let _ = Command::new("mkdir").arg("-p").arg(tmpdir.as_str().clone().to_string()+"META-INF").output().unwrap().stdout;
