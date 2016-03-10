@@ -26,11 +26,14 @@ fn zip<'a>() {
 	// let mut zip = ZipWriter::new(f);
 	// try!(zip.start_file("lib"+toml_lookup("package.name")+".zip", Stored));
 	// try!(zip.write());
-	let tmpdir : String = String::from_utf8_lossy(&Command::new("mktemp").arg("-dt").arg("rust-celix.XXXXXXXXXXXXXX").output().unwrap().stdout).into_owned().trim_right().to_string();
+	let tmpdir : String = String::from_utf8_lossy(&Command::new("mktemp").arg("-dt").arg("rust-celix.XXXXXXXXXXXXXX").output().unwrap().stdout).into_owned().trim_right().to_string() + "/";
 	// println!("{:?}", tmpdir);
 	//copy files into tmpdir
-	copy(get_lib_name("target/release/lib",".so"),get_lib_name(tmpdir.as_str(),".so"));
-	println!("{}", String::from_utf8_lossy(&Command::new("zip").current_dir(tmpdir).arg(get_lib_name(tmpdir.as_str(),".zip")).arg(get_lib_name(tmpdir.as_str(),".so")).output().unwrap().stdout));
+	println!("{}", get_lib_name((tmpdir.as_str().clone().to_string()+"lib").as_str().clone(),".so"));
+    copy(get_lib_name("target/release/lib",".so"),get_lib_name((tmpdir.as_str().clone().to_string()+"lib").as_str().clone(),".so"));
+	println!("{}", String::from_utf8_lossy(&Command::new("pwd").current_dir(tmpdir.as_str().clone()).output().unwrap().stdout));
+	println!("{}", String::from_utf8_lossy(&Command::new("zip").current_dir(tmpdir.as_str().clone()).arg(get_lib_name("",".zip")).arg(get_lib_name("lib",".so")).output().unwrap().stdout));
+	let _ = Command::new("rm").arg("-rf").arg(tmpdir).output().unwrap().stdout;
 }
 
 fn check_built(ext: &str) -> bool {
