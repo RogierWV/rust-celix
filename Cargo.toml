@@ -10,8 +10,11 @@ rustc-serialize = "0.3"
 toml = "0.1"
 
 [build-dependencies]
-bindgen = { git = "https://github.com/crabtw/rust-bindgen.git" }
 cmacros = "0.1.0"
+
+[build-dependencies.bindgen]
+git = "https://github.com/crabtw/rust-bindgen.git"
+rev = "b832eb19" #temporary downgrade until bindgen gets fixed
 
 [lib]
 path = "src/lib.rs"
