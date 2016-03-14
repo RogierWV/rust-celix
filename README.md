@@ -1,7 +1,7 @@
 # rust-celix
-Rust bindings for Apache Celix.
+Rust bindings for Apache Celix. Provides bindings for Celix and a build tool for compiling and packing a Celix bundle.
 
-Provides bindings for Celix and a build tool for compiling and packing a Celix bundle.
+rustdoc available at http://rogierwv.github.io/celix-rust/celix.
 
 ## Requirements
 * Linux (might work on other Unix(like) systems, but not tested)
