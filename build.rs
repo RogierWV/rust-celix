@@ -53,8 +53,7 @@ fn gen_headers<'a>(path: &'a str, root: &'a str) -> (String,String) {
 }
 
 fn main() {
-	// let mut celix_path: String = String::from("/usr/local/include/celix");
-	let mut celix_path: String = match env::var("CELIX_PATH") {
+	let celix_path: String = match env::var("CELIX_PATH") {
 		Err(_) => String::from("/usr/local/include/celix"),
 		Ok(ref s) => s.clone()
 	};
