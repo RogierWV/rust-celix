@@ -11,6 +11,7 @@ rustdoc available at http://rogierwv.github.io/rust-celix/celix.
 * git
 * Rust (only tested on nightly)
 * Cargo
+* Clang (code generation depends on it)
 
 ## Installation
 ```bash
