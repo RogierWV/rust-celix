@@ -1,23 +1,60 @@
 extern crate rustc_serialize;
 extern crate toml;
-// use std::env::args;
 use std::fs::{File,metadata,copy};
-// use std::path::Path;
 use std::io::prelude::*;
+use std::env;
+use std::path::Path;
 use std::process::Command;
 use rustc_serialize::json::Json;
 
+/// Expands into the expected `Command::new($command).current_dir($dir).arg($arg).arg($arg)...output().unwrap()`
+macro_rules! cmd {
+	( $command:expr, $dir:expr $(, $arg:expr )* ) => { 
+		match Command::new($command)
+		.current_dir($dir)
+		$(
+			.arg($arg)
+		)*
+		.output()
+		{
+			Ok(output) => output,
+			Err(e) => panic!("Failed to execute command {}: {}", $command, e)
+		}
+	};
+}
+
+macro_rules! write_file {
+	( $filename:expr, $contents:expr ) => {
+		match File::create($filename)
+		.unwrap()
+		.write_all($contents)
+		{
+			Ok(()) => println!("Succesfully written {}", $filename),
+			Err(e) => panic!("Failed to write to {}: {}", $filename, e)
+		}
+	};
+}
+
 fn main() {
 	println!("cargo-celix version {}", env!("CARGO_PKG_VERSION"));
+	let _ = env::set_current_dir(Path::new(get_cargo_toml_path().as_str()).parent().unwrap());
 	if !check_built(".so") {
 		println!("Need to build!");
-		println!("{}",cargo("build"));
+		// cmd!("cargo", ".", "build", "--release");
+		let _ = Command::new("cargo").arg("build").arg("--release").status().unwrap();
 	}
-	copy_bundles("/usr/local/share/celix");
+	let celix_dir = match env::var("CELIX_PATH") {
+		Err(_) => String::from("/usr/local/"),
+		Ok(ref s) => s.clone()
+	};
+	copy_bundles(celix_dir.as_str());
 	create_bundle();
 	write_config();
 }
 
+/// Generate MANIFEST.MF
+///
+/// Formats a base string using package name and version
 fn manifest() -> String {
 	let package_name = toml_lookup("package.name").replace("-","_");
 	return format!(
@@ -30,58 +67,121 @@ Private-Library: lib{}.so
 ", package_name,package_name,toml_lookup("package.version"),package_name,package_name);
 }
 
+/// Copy base Celix bundles
+///
+/// Copies the base Celix bundles to ./deploy/bundles
 fn copy_bundles(celix_dir: &str) {
-	let bundle_dir = celix_dir.to_string() + "/bundles/";
-	let _ = Command::new("mkdir").arg("-p").arg("deploy/bundles").output().unwrap();
-	copy(bundle_dir.as_str().clone().to_string() + "shell.zip", "deploy/bundles/shell.zip").unwrap();
-	copy(bundle_dir.as_str().clone().to_string() + "shell_tui.zip", "deploy/bundles/shell_tui.zip").unwrap();
+	let _ = env::set_current_dir(Path::new(get_cargo_toml_path().as_str()).parent().unwrap());
+	let bundle_dir = celix_dir.to_string() + "/share/celix/bundles/";
+	// let _ = Command::new("mkdir").arg("-p").arg("deploy/bundles").output().unwrap();
+	let _ = cmd!("mkdir", ".", "-p", "target/deploy/bundles");
+	copy(bundle_dir.as_str().clone().to_string() + "shell.zip", "target/deploy/bundles/shell.zip").unwrap();
+	copy(bundle_dir.as_str().clone().to_string() + "shell_tui.zip", "target/deploy/bundles/shell_tui.zip").unwrap();
 }
 
+/// Writes config file
+/// 
+/// Uses a basic template (which starts this bundle along with shell and shell_tui) to generate and write a config file to ./deploy
 fn write_config(){
-	let conf = format!("cosgi.auto.start.1=bundles/{}.zip bundles/shell_tui.zip bundles/shell.zip", toml_lookup("package.name").replace("-","_"));
-	File::create("deploy/config.properties").unwrap().write_all(conf.as_bytes()).unwrap();
+	let _ = env::set_current_dir(Path::new(get_cargo_toml_path().as_str()).parent().unwrap());
+	let conf = 
+		format!("cosgi.auto.start.1=bundles/{}.zip bundles/shell_tui.zip bundles/shell.zip", 
+			toml_lookup("package.name")
+			.replace("-","_"));
+
+	write_file!("target/deploy/config.properties", conf.as_bytes());
 }
 
+/// Create a Celix bundle from the built .so file.
+/// 
+/// Creates a temporary directory in /tmp, then moves the .so file there, creates a MANIFEST.MF there, zips them both, andcopies the result into ./deploy/bundles
 fn create_bundle() {
-	let tmpdir : String = String::from_utf8_lossy(&Command::new("mktemp").arg("-dt").arg("rust-celix.XXXXXXXXXXXXXX").output().unwrap().stdout).into_owned().trim_right().to_string() + "/";
-	let _ = copy(get_lib_name("target/release/lib",".so"),get_lib_name((tmpdir.as_str().clone().to_string()+"lib").as_str().clone(),".so"));
-	let _ = Command::new("mkdir").arg("-p").arg(tmpdir.as_str().clone().to_string()+"META-INF").output().unwrap().stdout;
-	File::create(tmpdir.as_str().clone().to_string()+"META-INF/MANIFEST.MF").unwrap().write_all(manifest().as_bytes()).unwrap();
-	println!("{}", String::from_utf8_lossy(&Command::new("ls").current_dir(tmpdir.as_str().clone()).output().unwrap().stdout));
-	println!("{}", String::from_utf8_lossy(&Command::new("zip").current_dir(tmpdir.as_str().clone()).arg(get_lib_name("",".zip")).arg(get_lib_name("lib",".so")).arg("META-INF/MANIFEST.MF").output().unwrap().stdout));
-	let _ = copy(get_lib_name(tmpdir.as_str().clone(),".zip"),("deploy/bundles/".to_string()+toml_lookup("package.name").replace("-","_").as_str()).to_string()+".zip");
-	let _ = Command::new("rm").arg("-rf").arg(tmpdir).output().unwrap().stdout;
+	let _ = env::set_current_dir(Path::new(get_cargo_toml_path().as_str()).parent().unwrap());
+	let tmpdir = String::from_utf8_lossy(
+		&cmd!("mktemp", ".", "-dt", "rust-celix.XXXXXXXXXXXXXX").stdout)
+		.into_owned()
+		.trim_right()
+		.to_string() 
+		+ "/";
+
+	let _ = 
+		copy(
+			get_lib_name(
+				"target/release/lib",
+				".so"),
+			get_lib_name(
+				(tmpdir
+					.as_str()
+					.clone()
+					.to_string()
+					+"lib")
+				.as_str()
+				.clone(),
+				".so"));
+
+	let _ = cmd!("mkdir", ".", "-p", tmpdir.as_str().clone().to_string()+"META-INF");
+
+	write_file!(tmpdir.as_str().clone().to_string()+"META-INF/MANIFEST.MF", manifest().as_bytes());
+
+	println!("{}", 
+		String::from_utf8_lossy(
+			&cmd!( "tree", tmpdir.as_str().clone() ).stdout)
+		);
+
+	println!("{}", String::from_utf8_lossy(
+		&cmd!("zip", 
+			tmpdir.as_str().clone(), 
+			get_lib_name("",".zip"), 
+			get_lib_name("lib",".so"), 
+			"META-INF/MANIFEST.MF")
+		.stdout));
+
+	let _ = 
+		copy(
+			get_lib_name(tmpdir.as_str().clone(),".zip"),
+			("target/deploy/bundles/".to_string()
+				+toml_lookup("package.name")
+				.replace("-","_")
+				.as_str())
+			.to_string()
+			+".zip");
+
+	let _ = cmd!("rm", ".", "-rf", tmpdir);
 }
 
+/// Checks whether the .so exists
 fn check_built(ext: &str) -> bool {
 	metadata(get_lib_name("target/release/lib",ext)).is_ok()
 }
 
+/// Returns path to Cargo.toml
 fn get_cargo_toml_path() -> String {
-	let output = cargo("locate-project");
-	let json = 
-		match Json::from_str(&*output) {
+	let outvec : Vec<u8> = cmd!("cargo", ".", "locate-project").stdout;
+	let output = String::from_utf8(outvec).unwrap().to_owned();
+	let json = //output.to_json();
+		match Json::from_str(output.as_str()) {
 			Ok(j) => j,
-			Err(_) => panic!("Couldn't parse the output of `cargo locate-project`")
+			Err(_) => panic!("Couldn\'t parse the output of `cargo locate-project`"),
 		};
+	println!("{:?}", json);
 	json["root"].as_string().unwrap().to_string()
+	// String::from("./Cargo.toml") // only works in root directory now anyway
 }
 
-fn cargo(command: &str) -> String {
-	if command == "build" {
-		let output = Command::new("cargo").arg("build").arg("--release").output().unwrap();
-		return String::from_utf8_lossy(&output.stdout).into_owned();
-	} else {
-		let output = Command::new("cargo").arg(command).output().unwrap();
-		return String::from_utf8_lossy(&output.stdout).into_owned();
-	}
-}
-
+/// Gets the library name from the Cargo file
+///
+/// Prepends `pre` and appends `ext`.
+/// Example:
+/// ```
+/// get_lib_name("lib",".so");
+/// ```
+/// Would return something along the lines of `libpackagename.so`
 fn get_lib_name(pre: &str, ext: &str) -> String {
 	let base_name = toml_lookup("package.name").replace("-","_");
 	((pre.to_string() + base_name.as_str()) + ext).to_string()
 }
 
+/// Looks up the specified key in Cargo.toml
 fn toml_lookup(name: &str) -> String {
 	let toml_path = get_cargo_toml_path();
 	let mut toml_file = match File::open(toml_path) {
