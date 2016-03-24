@@ -129,12 +129,13 @@ fn create_bundle() {
 		);
 
 	println!("{}", String::from_utf8_lossy(
-		&cmd!("zip", 
+		&cmd!("jar", 
 			tmpdir.as_str().clone(), 
+			"cfm",
 			get_lib_name("",".zip"), 
-			get_lib_name("lib",".so"), 
-			"META-INF/MANIFEST.MF")
-		.stdout));
+			"META-INF/MANIFEST.MF",
+			get_lib_name("lib",".so") 
+		).stdout));
 
 	let _ = 
 		copy(
@@ -158,14 +159,12 @@ fn check_built(ext: &str) -> bool {
 fn get_cargo_toml_path() -> String {
 	let outvec : Vec<u8> = cmd!("cargo", ".", "locate-project").stdout;
 	let output = String::from_utf8(outvec).unwrap().to_owned();
-	let json = //output.to_json();
+	let json = 
 		match Json::from_str(output.as_str()) {
 			Ok(j) => j,
 			Err(_) => panic!("Couldn\'t parse the output of `cargo locate-project`"),
 		};
-	println!("{:?}", json);
 	json["root"].as_string().unwrap().to_string()
-	// String::from("./Cargo.toml") // only works in root directory now anyway
 }
 
 /// Gets the library name from the Cargo file
