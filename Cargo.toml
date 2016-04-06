@@ -1,6 +1,6 @@
 [package]
 name = "celix"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Rogier Velting <rogiervelting@gmail.com>"]
 build = "build.rs"
 
