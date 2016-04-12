@@ -16,7 +16,7 @@ fn gen_headers<'a>(path: &'a str, root: &'a str) -> (String,String) {
 			panic!("Failed to get filetype of file {:?}: {}", f.path(), e);
 		});
 		if ftype.is_file() {
-			main_buf.push_str("#include<"); 
+			main_buf.push_str("#include<");
 			// let d: & str = f.path().strip_prefix(root).unwrap().parent().unwrap().to_str().unwrap();
 			main_buf.push_str(f.path().strip_prefix(root).unwrap().parent().unwrap().to_str().unwrap());
 			if f.path().strip_prefix(root).unwrap().parent().unwrap().to_str().unwrap() != "" {
@@ -42,6 +42,7 @@ fn gen_headers<'a>(path: &'a str, root: &'a str) -> (String,String) {
 					}
 				}
 			).as_str());
+			def_buf.push_str("\n")
 		}
 		else if ftype.is_dir() {
 			let (tmp_main,tmp_def) = gen_headers(f.path().to_str().unwrap(), root);
@@ -62,7 +63,7 @@ fn main() {
 	f.write_all(tmp_main.as_bytes()).unwrap();
 	let mut def = File::create(Path::new(env::var("OUT_DIR").unwrap().as_str()).join("constants.rs")).unwrap();
 	def.write_all(tmp_def.as_bytes()).unwrap();
-	
+
 	let mut bindings = bindgen::builder();
 	bindings.header(String::from(Path::new(env::var("OUT_DIR").unwrap().as_str()).join("inc.h").to_str().unwrap()));
 	bindings.emit_builtins();
