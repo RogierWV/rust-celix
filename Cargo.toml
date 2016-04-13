@@ -1,20 +1,16 @@
 [package]
 name = "celix"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Rogier Velting <rogiervelting@gmail.com>"]
 # build = "build.rs"
 
-[dependencies]
-# zip = { version = "0.1.16", default-features = false }
-rustc-serialize = "0.3"
-toml = "0.1"
+[dependencies.toml]
+version = "0.1"
+default-features = false
+optional = true
 
-[build-dependencies]
-# cmacros = "0.1.0"
-
-# [build-dependencies.bindgen]
-# git = "https://github.com/crabtw/rust-bindgen.git"
-# rev = "b832eb19" #temporary downgrade until bindgen gets fixed
+[features]
+default = ["toml"]
 
 [lib]
 path = "src/lib.rs"
@@ -22,3 +18,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "cargo-celix"
 path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false

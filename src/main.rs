@@ -1,15 +1,14 @@
-extern crate rustc_serialize;
 extern crate toml;
 use std::fs::{File,metadata,copy};
 use std::io::prelude::*;
 use std::env;
 use std::path::Path;
 use std::process::Command;
-use rustc_serialize::json::Json;
+// use std::str::FromStr;
 
 /// Expands into the expected `Command::new($command).current_dir($dir).arg($arg).arg($arg)...output().unwrap()`
 macro_rules! cmd {
-	( $command:expr, $dir:expr $(, $arg:expr )* ) => { 
+	( $command:expr, $dir:expr $(, $arg:expr )* ) => {
 		match Command::new($command)
 		.current_dir($dir)
 		$(
@@ -25,13 +24,14 @@ macro_rules! cmd {
 
 macro_rules! write_file {
 	( $filename:expr, $contents:expr ) => {
-		match File::create($filename)
+		File::create($filename)
 		.unwrap()
 		.write_all($contents)
-		{
-			Ok(()) => println!("Succesfully written {}", $filename),
-			Err(e) => panic!("Failed to write to {}: {}", $filename, e)
-		}
+		.expect("Failed to write to file!")
+		// {
+		// 	Ok(()) => println!("Succesfully written {}", $filename),
+		// 	Err(e) => panic!("Failed to write to {}: {}", $filename, e)
+		// }
 	};
 }
 
@@ -50,6 +50,7 @@ fn main() {
 	copy_bundles(celix_dir.as_str());
 	create_bundle();
 	write_config();
+	println!("Done!");
 }
 
 /// Generate MANIFEST.MF
@@ -80,12 +81,12 @@ fn copy_bundles(celix_dir: &str) {
 }
 
 /// Writes config file
-/// 
+///
 /// Uses a basic template (which starts this bundle along with shell and shell_tui) to generate and write a config file to ./deploy
 fn write_config(){
 	let _ = env::set_current_dir(Path::new(get_cargo_toml_path().as_str()).parent().unwrap());
-	let conf = 
-		format!("cosgi.auto.start.1=bundles/{}.zip bundles/shell_tui.zip bundles/shell.zip", 
+	let conf =
+		format!("cosgi.auto.start.1=bundles/{}.zip bundles/shell_tui.zip bundles/shell.zip",
 			toml_lookup("package.name")
 			.replace("-","_"));
 
@@ -93,7 +94,7 @@ fn write_config(){
 }
 
 /// Create a Celix bundle from the built .so file.
-/// 
+///
 /// Creates a temporary directory in /tmp, then moves the .so file there, creates a MANIFEST.MF there, zips them both, andcopies the result into ./deploy/bundles
 fn create_bundle() {
 	let _ = env::set_current_dir(Path::new(get_cargo_toml_path().as_str()).parent().unwrap());
@@ -101,10 +102,10 @@ fn create_bundle() {
 		&cmd!("mktemp", ".", "-dt", "rust-celix.XXXXXXXXXXXXXX").stdout)
 		.into_owned()
 		.trim_right()
-		.to_string() 
+		.to_string()
 		+ "/";
 
-	let _ = 
+	let _ =
 		copy(
 			get_lib_name(
 				"target/release/lib",
@@ -123,21 +124,20 @@ fn create_bundle() {
 
 	write_file!(tmpdir.as_str().clone().to_string()+"META-INF/MANIFEST.MF", manifest().as_bytes());
 
-	println!("{}", 
-		String::from_utf8_lossy(
-			&cmd!( "tree", tmpdir.as_str().clone() ).stdout)
-		);
+	// println!("{}",
+	// 	String::from_utf8_lossy(
+	// 		&cmd!( "tree", tmpdir.as_str().clone() ).stdout)
+	// 	);
 
-	println!("{}", String::from_utf8_lossy(
-		&cmd!("jar", 
-			tmpdir.as_str().clone(), 
-			"cfm",
-			get_lib_name("",".zip"), 
-			"META-INF/MANIFEST.MF",
-			get_lib_name("lib",".so") 
-		).stdout));
+	&cmd!("jar",
+		tmpdir.as_str().clone(),
+		"cfm",
+		get_lib_name("",".zip"),
+		"META-INF/MANIFEST.MF",
+		get_lib_name("lib",".so")
+	);
 
-	let _ = 
+	let _ =
 		copy(
 			get_lib_name(tmpdir.as_str().clone(),".zip"),
 			("target/deploy/bundles/".to_string()
@@ -159,12 +159,7 @@ fn check_built(ext: &str) -> bool {
 fn get_cargo_toml_path() -> String {
 	let outvec : Vec<u8> = cmd!("cargo", ".", "locate-project").stdout;
 	let output = String::from_utf8(outvec).unwrap().to_owned();
-	let json = 
-		match Json::from_str(output.as_str()) {
-			Ok(j) => j,
-			Err(_) => panic!("Couldn\'t parse the output of `cargo locate-project`"),
-		};
-	json["root"].as_string().unwrap().to_string()
+	output.split(':').collect::<Vec<&str>>()[1].replace("\"","").replace("}","").replace("\n","")
 }
 
 /// Gets the library name from the Cargo file
@@ -187,7 +182,7 @@ fn toml_lookup(name: &str) -> String {
 			Ok(f) => f,
 			Err(_) => panic!("Couldn't open Cargo.toml")
 		};
-	
+
 	let mut contents = String::new();
 	toml_file.read_to_string(&mut contents).unwrap();
 
