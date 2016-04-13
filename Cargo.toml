@@ -2,7 +2,6 @@
 name = "celix"
 version = "0.3.1"
 authors = ["Rogier Velting <rogiervelting@gmail.com>"]
-# build = "build.rs"
 
 [dependencies.toml]
 version = "0.1"

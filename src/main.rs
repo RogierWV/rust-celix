@@ -1,10 +1,16 @@
+#![feature(const_fn)]
+
 extern crate toml;
-use std::fs::{File,metadata,copy};
+use std::fs::{File,metadata,copy,create_dir_all};
 use std::io::prelude::*;
 use std::env;
 use std::path::Path;
 use std::process::Command;
-// use std::str::FromStr;
+use std::thread;
+use std::sync::{Once, ONCE_INIT};
+
+static START: Once = ONCE_INIT;
+static mut toml_path: *mut String = std::ptr::null_mut();
 
 /// Expands into the expected `Command::new($command).current_dir($dir).arg($arg).arg($arg)...output().unwrap()`
 macro_rules! cmd {
@@ -37,6 +43,9 @@ macro_rules! write_file {
 
 fn main() {
 	println!("cargo-celix version {}", env!("CARGO_PKG_VERSION"));
+	START.call_once(|| {
+		unsafe {toml_path = Box::into_raw(Box::new(get_cargo_toml_path())); }
+	});
 	let _ = env::set_current_dir(Path::new(get_cargo_toml_path().as_str()).parent().unwrap());
 	if !check_built(".so") {
 		println!("Need to build!");
@@ -51,6 +60,9 @@ fn main() {
 	create_bundle();
 	write_config();
 	println!("Done!");
+	unsafe{
+		let _ = Box::from_raw(toml_path);
+	}
 }
 
 /// Generate MANIFEST.MF
@@ -75,9 +87,14 @@ fn copy_bundles(celix_dir: &str) {
 	let _ = env::set_current_dir(Path::new(get_cargo_toml_path().as_str()).parent().unwrap());
 	let bundle_dir = celix_dir.to_string() + "/share/celix/bundles/";
 	// let _ = Command::new("mkdir").arg("-p").arg("deploy/bundles").output().unwrap();
-	let _ = cmd!("mkdir", ".", "-p", "target/deploy/bundles");
-	copy(bundle_dir.as_str().clone().to_string() + "shell.zip", "target/deploy/bundles/shell.zip").unwrap();
-	copy(bundle_dir.as_str().clone().to_string() + "shell_tui.zip", "target/deploy/bundles/shell_tui.zip").unwrap();
+	// let _ = cmd!("mkdir", ".", "-p", "target/deploy/bundles");
+	create_dir_all("target/deploy/bundles").expect("Failed to create `target/deploy/bundles`!");
+	let bdir1 = bundle_dir.clone();
+	let t1 = thread::spawn(move || {copy(bdir1.as_str().clone().to_string() + "shell.zip", "target/deploy/bundles/shell.zip").unwrap()});
+	let bdir2 = bundle_dir.clone();
+	let t2 = thread::spawn(move || {copy(bdir2.as_str().clone().to_string() + "shell_tui.zip", "target/deploy/bundles/shell_tui.zip").unwrap()});
+	let _ = t1.join();
+	let _ = t2.join();
 }
 
 /// Writes config file
@@ -120,7 +137,8 @@ fn create_bundle() {
 				.clone(),
 				".so"));
 
-	let _ = cmd!("mkdir", ".", "-p", tmpdir.as_str().clone().to_string()+"META-INF");
+	// let _ = cmd!("mkdir", ".", "-p", tmpdir.as_str().clone().to_string()+"META-INF");
+	create_dir_all(tmpdir.as_str().clone().to_string()+"META-INF").expect("Failed to create META-INF in temp directory!");
 
 	write_file!(tmpdir.as_str().clone().to_string()+"META-INF/MANIFEST.MF", manifest().as_bytes());
 
@@ -147,7 +165,7 @@ fn create_bundle() {
 			.to_string()
 			+".zip");
 
-	let _ = cmd!("rm", ".", "-rf", tmpdir);
+	thread::spawn(||{let _ = cmd!("rm", ".", "-rf", tmpdir);});
 }
 
 /// Checks whether the .so exists
@@ -157,9 +175,19 @@ fn check_built(ext: &str) -> bool {
 
 /// Returns path to Cargo.toml
 fn get_cargo_toml_path() -> String {
-	let outvec : Vec<u8> = cmd!("cargo", ".", "locate-project").stdout;
-	let output = String::from_utf8(outvec).unwrap().to_owned();
-	output.split(':').collect::<Vec<&str>>()[1].replace("\"","").replace("}","").replace("\n","")
+	String::from_utf8(
+		Command::new("cargo")
+		.arg("locate-project")
+		.output()
+		.expect("Failed to execute cargo locate-project")
+		.stdout
+	).unwrap()
+	.to_owned()
+	.split(':')
+	.collect::<Vec<&str>>()[1]
+	.replace("\"","")
+	.replace("}","")
+	.replace("\n","")
 }
 
 /// Gets the library name from the Cargo file
@@ -177,11 +205,15 @@ fn get_lib_name(pre: &str, ext: &str) -> String {
 
 /// Looks up the specified key in Cargo.toml
 fn toml_lookup(name: &str) -> String {
-	let toml_path = get_cargo_toml_path();
-	let mut toml_file = match File::open(toml_path) {
-			Ok(f) => f,
-			Err(_) => panic!("Couldn't open Cargo.toml")
-		};
+	// let toml_path = get_cargo_toml_path();
+	let mut toml_file;
+	unsafe {
+		// println!("toml_path: {:?}", &**toml_path);
+		toml_file = match File::open(&*toml_path) {
+				Ok(f) => f,
+				Err(_) => panic!("Couldn't open Cargo.toml")
+			};
+		}
 
 	let mut contents = String::new();
 	toml_file.read_to_string(&mut contents).unwrap();
