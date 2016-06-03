@@ -2732,7 +2732,7 @@ pub mod gen {
          -> celix_status_t;
         pub fn bundleContext_registerService(context: bundle_context_pt,
                                              serviceName:
-                                                 *mut ::std::os::raw::c_char,
+                                                 *const ::std::os::raw::c_char,
                                              svcObj: *mut ::std::os::raw::c_void,
                                              properties: properties_pt,
                                              service_registration:

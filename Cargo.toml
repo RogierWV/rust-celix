@@ -8,8 +8,12 @@ version = "0.1"
 default-features = false
 optional = true
 
+[dependencies.getopts]
+version = "0.2.14"
+optional = true
+
 [features]
-default = ["toml"]
+default = ["toml","getopts"]
 
 [lib]
 path = "src/lib.rs"

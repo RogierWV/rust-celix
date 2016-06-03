@@ -1,6 +1,8 @@
 #![feature(const_fn)]
 
 extern crate toml;
+extern crate getopts;
+use getopts::Options;
 use std::fs::{File,metadata,copy,create_dir_all};
 use std::io::prelude::*;
 use std::env;
@@ -8,6 +10,7 @@ use std::path::Path;
 use std::process::Command;
 use std::thread;
 use std::sync::{Once, ONCE_INIT};
+use std::time::Instant;
 
 static START: Once = ONCE_INIT;
 static mut toml_path: *mut String = std::ptr::null_mut();
@@ -43,6 +46,25 @@ macro_rules! write_file {
 
 fn main() {
 	println!("cargo-celix version {}", env!("CARGO_PKG_VERSION"));
+	let args : Vec<String> = env::args().collect();
+	// for arg in args {
+	// loop {
+	// 	match args.next() { None => break, Some(arg) => {
+	//     println!("{} ", arg);
+	// 	match arg.as_str() {
+	// 		"new" => {
+	// 			println!("{:?}", args.next());
+	// 		},
+	// 		"build" => {},
+	// 		"--bin" => {},
+	// 		"--release" => {}
+	// 		_ => {}
+	// 	}}}
+	// }
+
+	// let program = args[0].clone() + args[1].clone().as_str();
+	let program = vec![args[0].clone(), args[1].clone()].join(" ");
+	println!("{:?}", program);
 	START.call_once(|| {
 		unsafe {toml_path = Box::into_raw(Box::new(get_cargo_toml_path())); }
 	});
@@ -77,7 +99,8 @@ Bundle-Name: {}
 Bundle-Version: {}
 Bundle-Activator: lib{}.so
 Private-Library: lib{}.so
-", package_name,package_name,toml_lookup("package.version"),package_name,package_name);
+CREATION-TIME: {:?}
+", package_name,package_name,toml_lookup("package.version"),package_name,package_name,Instant::now());
 }
 
 /// Copy base Celix bundles
@@ -90,9 +113,9 @@ fn copy_bundles(celix_dir: &str) {
 	// let _ = cmd!("mkdir", ".", "-p", "target/deploy/bundles");
 	create_dir_all("target/deploy/bundles").expect("Failed to create `target/deploy/bundles`!");
 	let bdir1 = bundle_dir.clone();
-	let t1 = thread::spawn(move || {copy(bdir1.as_str().clone().to_string() + "shell.zip", "target/deploy/bundles/shell.zip").unwrap()});
+	let t1 = thread::spawn(move || {copy(bdir1.as_str().clone().to_string() + "shell.zip", "target/deploy/bundles/shell.zip").expect("Failed to copy shell.zip!")});
 	let bdir2 = bundle_dir.clone();
-	let t2 = thread::spawn(move || {copy(bdir2.as_str().clone().to_string() + "shell_tui.zip", "target/deploy/bundles/shell_tui.zip").unwrap()});
+	let t2 = thread::spawn(move || {copy(bdir2.as_str().clone().to_string() + "shell_tui.zip", "target/deploy/bundles/shell_tui.zip").expect("Failed to copy shell_tui.zip!")});
 	let _ = t1.join();
 	let _ = t2.join();
 }
